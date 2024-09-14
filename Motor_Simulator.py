@@ -89,8 +89,8 @@ def clarke_park_transform(Vq, Vd, angle):
     return Va, Vb, Vc
 
 def inverse_park_clarke_transform(Ia, Ib, Ic, angle):
-    Iq = (2/3) * (Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3))
-    Id = (2/3) * (-Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3))
+    Iq = np.sqrt(2/3) * (Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3))
+    Id = np.sqrt(2/3) * (-Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3))
     return Iq, Id
 
 def phase_current_ode(t, currents, Va, Vb, Vc, motor, angle):
