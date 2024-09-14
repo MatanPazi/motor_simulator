@@ -114,8 +114,8 @@ id_cmd_list = []
 def simulate_motor(motor, sim, app, control):
     speed = 0
     angle = 0
-    iq = 0
-    id = 0
+    iq_ramped = 0
+    id_ramped = 0
     Vq = 0
     Vd = 0
     torque = []
@@ -131,18 +131,18 @@ def simulate_motor(motor, sim, app, control):
         else:
             speed += torque_current / motor.inertia * sim.time_step
 
-        if iq < app.commanded_iq:
-            iq += app.current_ramp_rate * sim.time_step
-        if id > app.commanded_id:   # id is always negative
-            id -= app.current_ramp_rate * sim.time_step
+        if iq_ramped < app.commanded_iq:
+            iq_ramped += app.current_ramp_rate * sim.time_step
+        if id_ramped > app.commanded_id:   # id is always negative
+            id_ramped -= app.current_ramp_rate * sim.time_step
 
-        iq_cmd_list.append(iq)
-        id_cmd_list.append(id)
+        iq_cmd_list.append(iq_ramped)
+        id_cmd_list.append(id_ramped)
 
 
         Iq_sensed, Id_sensed = park_transform(Ia, Ib, Ic, angle)
-        error_iq = iq - Iq_sensed
-        error_id = id - Id_sensed
+        error_iq = iq_ramped - Iq_sensed
+        error_id = id_ramped - Id_sensed
 
         iq_list.append(Iq_sensed)
         id_list.append(Id_sensed)
