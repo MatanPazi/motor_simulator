@@ -78,17 +78,15 @@ class MotorControl:
         
         return Vq, Vd
 
-def clarke_park_transform(Vq, Vd, angle):
-    V_alpha = Vq * np.cos(angle) - Vd * np.sin(angle)
-    V_beta = Vq * np.sin(angle) + Vd * np.cos(angle)
+def inverse_park_transform(Vq, Vd, angle):
     
-    Va = V_alpha
-    Vb = -0.5 * V_alpha + (np.sqrt(3) / 2) * V_beta
-    Vc = -0.5 * V_alpha - (np.sqrt(3) / 2) * V_beta
+    Va = np.sqrt(2/3) * (Vd * np.cos(angle) - Vq * np.sin(angle))
+    Vb = np.sqrt(2/3) * (Vd * np.cos(angle - 2*np.pi/3) - Vq * np.sin(angle - 2*np.pi/3))
+    Vc = np.sqrt(2/3) * (Vd * np.cos(angle + 2*np.pi/3) - Vq * np.sin(angle + 2*np.pi/3))
     
     return Va, Vb, Vc
 
-def inverse_park_clarke_transform(Ia, Ib, Ic, angle):
+def park_transform(Ia, Ib, Ic, angle):
     Iq = np.sqrt(2/3) * (Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3))
     Id = np.sqrt(2/3) * (-Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3))
     return Iq, Id
@@ -142,7 +140,7 @@ def simulate_motor(motor, sim, app, control):
         id_cmd_list.append(id)
 
 
-        Iq_sensed, Id_sensed = inverse_park_clarke_transform(Ia, Ib, Ic, angle)
+        Iq_sensed, Id_sensed = park_transform(Ia, Ib, Ic, angle)
         error_iq = iq - Iq_sensed
         error_id = id - Id_sensed
 
@@ -151,7 +149,7 @@ def simulate_motor(motor, sim, app, control):
 
         Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd)
 
-        Va, Vb, Vc = clarke_park_transform(Vq, Vd, angle)
+        Va, Vb, Vc = inverse_park_transform(Vq, Vd, angle)
 
         # Solve the ODE for phase currents over one time step
         sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
