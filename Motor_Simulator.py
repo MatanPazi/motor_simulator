@@ -48,7 +48,7 @@ class Simulation:
 
 class Application:
     def __init__(self, speed_control=True, commanded_speed=1000, commanded_iq=1.0, commanded_id=0.0,
-                 speed_ramp_rate=1000000, current_ramp_rate=10000, vBus = 48):
+                 speed_ramp_rate=1000000, current_ramp_rate=10000, vBus = 1):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -109,40 +109,33 @@ def phase_current_ode(t, currents, Va, Vb, Vc, motor, angle):
     return [dIa_dt, dIb_dt, dIc_dt]
 
 
-def center_aligned_pwm_with_deadtime(Va, Vb, Vc, Vbus, t, switching_freq, deadtime):
+def center_aligned_pwm_with_deadtime(Va, Vb, Vc, Vbus, t, switching_freq, dead_time):
     """
-    Generate center-aligned PWM signals with symmetrical dead time for each phase based on voltage commands.
-    Va, Vb, Vc: phase voltages
-    Vbus: bus voltage
-    t: current simulation time
-    switching_freq: PWM switching frequency
-    deadtime: dead time between switching events (seconds)
+    Generates center-aligned PWM signals for top and bottom transistors with dead-time insertion.
     """
-    switch_period = 1 / switching_freq
-    half_period = switch_period / 2
+    pwm_period = 1 / switching_freq
+    half_period = pwm_period / 2
 
-    # Time in the switching period
-    time_in_period = t % switch_period
+    # Calculate the time in the current PWM period
+    time_in_period = t % pwm_period
+
+    # Calculate duty cycles for each phase (between 0 and 1)
+    duty_a = (Va / Vbus + 1) / 2
+    duty_b = (Vb / Vbus + 1) / 2
+    duty_c = (Vc / Vbus + 1) / 2
 
     # Create two triangular carrier waveforms with dead time shifts
-    # Top transistors carrier: shifted by +deadtime/2
-    # Bottom transistors carrier: shifted by -deadtime/2
-    top_carrier_wave = np.abs((time_in_period - half_period - deadtime / 2) / half_period)
-    bottom_carrier_wave = np.abs((time_in_period - half_period + deadtime / 2) / half_period)
+    carrier_wave = time_in_period / half_period if time_in_period < half_period else (pwm_period - time_in_period) / half_period
 
-    # Calculate duty cycle for each phase voltage (normalized by bus voltage)
-    duty_a = Va / Vbus + 0.5  # Duty cycle between 0 and 1
-    duty_b = Vb / Vbus + 0.5
-    duty_c = Vc / Vbus + 0.5
+    # Generate the PWM signals (1 for high, -1 for low)
+    pwm_a_top = 1 if carrier_wave > (duty_a + (dead_time / 2) / half_period) else 0
+    pwm_b_top = 1 if carrier_wave > (duty_b + (dead_time / 2) / half_period) else 0
+    pwm_c_top = 1 if carrier_wave > (duty_c + (dead_time / 2) / half_period) else 0
 
-    # Generate the PWM signals (-1 for low, 1 for high)
-    pwm_a_top = 1 if top_carrier_wave < duty_a else -1
-    pwm_b_top = 1 if top_carrier_wave < duty_b else -1
-    pwm_c_top = 1 if top_carrier_wave < duty_c else -1
-
-    pwm_a_bottom = 1 if bottom_carrier_wave < duty_a else -1
-    pwm_b_bottom = 1 if bottom_carrier_wave < duty_b else -1
-    pwm_c_bottom = 1 if bottom_carrier_wave < duty_c else -1
+    # The bottom transistors should be the inverse of the top ones, with dead time compensation
+    pwm_a_bottom = 1 if carrier_wave < (duty_a - (dead_time / 2) / half_period) else 0
+    pwm_b_bottom = 1 if carrier_wave < (duty_b - (dead_time / 2) / half_period) else 0
+    pwm_c_bottom = 1 if carrier_wave < (duty_c - (dead_time / 2) / half_period) else 0
 
     return np.array([pwm_a_top, pwm_b_top, pwm_c_top]), np.array([pwm_a_bottom, pwm_b_bottom, pwm_c_bottom])
 
@@ -155,31 +148,31 @@ def apply_voltage_during_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_botto
     Va_applied, Vb_applied, Vc_applied = 0, 0, 0
 
     # Phase A
-    if pwm_signals_top[0] == -1 and pwm_signals_bottom[0] == -1:
+    if pwm_signals_top[0] == 0 and pwm_signals_bottom[0] == 0:
         if Ia > 0:  # Positive current
             Va_applied = 0  # Bottom transistor's voltage (ground)
         else:  # Negative current
             Va_applied = app.vBus  # Top transistor's voltage (bus voltage)
     else:
-        Va_applied = (pwm_signals_top[0] - pwm_signals_bottom[0]) * app.vBus / 2
+        Va_applied = pwm_signals_top[0] * app.vBus
 
     # Phase B
-    if pwm_signals_top[1] == -1 and pwm_signals_bottom[1] == -1:
+    if pwm_signals_top[1] == 0 and pwm_signals_bottom[1] == 0:
         if Ib > 0:  # Positive current
             Vb_applied = 0  # Bottom transistor's voltage (ground)
         else:  # Negative current
             Vb_applied = app.vBus  # Top transistor's voltage (bus voltage)
     else:
-        Vb_applied = (pwm_signals_top[1] - pwm_signals_bottom[1]) * app.vBus / 2
+        Vb_applied = pwm_signals_top[1] * app.vBus
 
     # Phase C
-    if pwm_signals_top[2] == -1 and pwm_signals_bottom[2] == -1:
+    if pwm_signals_top[2] == 0 and pwm_signals_bottom[2] == 0:
         if Ic > 0:  # Positive current
             Vc_applied = 0  # Bottom transistor's voltage (ground)
         else:  # Negative current
             Vc_applied = app.vBus  # Top transistor's voltage (bus voltage)
     else:
-        Vc_applied = (pwm_signals_top[2] - pwm_signals_bottom[2]) * app.vBus / 2
+        Vc_applied = pwm_signals_top[2] * app.vBus
 
     return Va_applied, Vb_applied, Vc_applied
 
@@ -189,6 +182,13 @@ id_list = []
 
 iq_cmd_list = []
 id_cmd_list = []
+
+Va_Applied_list = []
+Vb_Applied_list = []
+Vc_Applied_list = []
+Va_list = []
+Vb_list = []
+Vc_list = []
 
 def simulate_motor(motor, sim, app, control):
     speed = 0
@@ -230,16 +230,28 @@ def simulate_motor(motor, sim, app, control):
 
         # Transform Vq and Vd to Va, Vb, Vc using inverse Park-Clarke
         Va, Vb, Vc = inverse_park_transform(Vq, Vd, angle)
+        Va_list.append(Va)
+        Vb_list.append(Vb)
+        Vc_list.append(Vc)
+
+
 
         # Generate center-aligned PWM signals for each phase with dead time compensation
         pwm_signals_top, pwm_signals_bottom = center_aligned_pwm_with_deadtime(Va, Vb, Vc, app.vBus, t, (1/control.sampling_time), control.deadTime)
 
         # Adjust the applied voltages during dead time based on current direction
         Va_applied, Vb_applied, Vc_applied = apply_voltage_during_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_bottom, motor)
+        Va_Applied_list.append(Va_applied)
+        Vb_Applied_list.append(Vb_applied)
+        Vc_Applied_list.append(Vc_applied)
 
+        # # Solve the ODE for phase currents over one time step
+        # sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
+        #                 args=(Va_applied, Vb_applied, Vc_applied, motor, angle), method='RK45')
+        
         # Solve the ODE for phase currents over one time step
         sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
-                        args=(Va_applied, Vb_applied, Vc_applied, motor, angle), method='RK45')
+                        args=(Va, Vb, Vc, motor, angle), method='RK45')
 
 
         Ia, Ib, Ic = sol.y[:, -1]
@@ -280,13 +292,27 @@ plt.plot(time_points, currents[:, 2], label='Ic')
 plt.title('Phase Currents')
 plt.legend()
 
-plt.subplot(4, 1, 2)
-plt.plot(time_points, iq_list, label='iqSensed')
-plt.plot(time_points, id_list, label='idSensed')
-plt.plot(time_points, iq_cmd_list, label='iqCmd')
-plt.plot(time_points, id_cmd_list, label='idCmd')
-plt.title('Iq, Id Cmd + Sensed')
+# plt.subplot(4, 1, 1)
+# plt.plot(time_points, Va_list, label='Va')
+# plt.plot(time_points, Vb_list, label='Vb')
+# plt.plot(time_points, Vc_list, label='Vc')
+# plt.title('V')
+# plt.legend()
+
+
+plt.subplot(4, 1, 1)
+plt.plot(time_points, Va_Applied_list, label='Va_App')
+plt.plot(time_points, Vb_Applied_list, label='Vb_App')
+plt.plot(time_points, Vc_Applied_list, label='Vc_App')
+plt.title('Applied V')
 plt.legend()
+# plt.subplot(4, 1, 2)
+# plt.plot(time_points, iq_list, label='iqSensed')
+# plt.plot(time_points, id_list, label='idSensed')
+# plt.plot(time_points, iq_cmd_list, label='iqCmd')
+# plt.plot(time_points, id_cmd_list, label='idCmd')
+# plt.title('Iq, Id Cmd + Sensed')
+# plt.legend()
 
 # Plot torque
 plt.subplot(4, 1, 3)
