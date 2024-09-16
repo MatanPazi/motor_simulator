@@ -41,14 +41,14 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=100e-9, total_time=0.01):
+    def __init__(self, time_step=100e-9, total_time=0.05):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
     def __init__(self, speed_control=True, commanded_speed=1000, commanded_iq=1.0, commanded_id=0.0,
-                 speed_ramp_rate=1000000, current_ramp_rate=10000, vBus = 1):
+                 speed_ramp_rate=1000000, current_ramp_rate=10000, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -128,14 +128,14 @@ def center_aligned_pwm_with_deadtime(Va, Vb, Vc, Vbus, t, switching_freq, dead_t
     carrier_wave = time_in_period / half_period if time_in_period < half_period else (pwm_period - time_in_period) / half_period
 
     # Generate the PWM signals (1 for high, -1 for low)
-    pwm_a_top = 1 if carrier_wave > (duty_a + (dead_time / 2) / half_period) else 0
-    pwm_b_top = 1 if carrier_wave > (duty_b + (dead_time / 2) / half_period) else 0
-    pwm_c_top = 1 if carrier_wave > (duty_c + (dead_time / 2) / half_period) else 0
+    pwm_a_top = 1 if carrier_wave > (1 - duty_a + (dead_time / 2) / half_period) else 0
+    pwm_b_top = 1 if carrier_wave > (1 - duty_b + (dead_time / 2) / half_period) else 0
+    pwm_c_top = 1 if carrier_wave > (1 - duty_c + (dead_time / 2) / half_period) else 0
 
     # The bottom transistors should be the inverse of the top ones, with dead time compensation
-    pwm_a_bottom = 1 if carrier_wave < (duty_a - (dead_time / 2) / half_period) else 0
-    pwm_b_bottom = 1 if carrier_wave < (duty_b - (dead_time / 2) / half_period) else 0
-    pwm_c_bottom = 1 if carrier_wave < (duty_c - (dead_time / 2) / half_period) else 0
+    pwm_a_bottom = 1 if carrier_wave < (1 - duty_a - (dead_time / 2) / half_period) else 0
+    pwm_b_bottom = 1 if carrier_wave < (1 - duty_b - (dead_time / 2) / half_period) else 0
+    pwm_c_bottom = 1 if carrier_wave < (1 - duty_c - (dead_time / 2) / half_period) else 0
 
     return np.array([pwm_a_top, pwm_b_top, pwm_c_top]), np.array([pwm_a_bottom, pwm_b_bottom, pwm_c_bottom])
 
@@ -245,13 +245,13 @@ def simulate_motor(motor, sim, app, control):
         Vb_Applied_list.append(Vb_applied)
         Vc_Applied_list.append(Vc_applied)
 
-        # # Solve the ODE for phase currents over one time step
-        # sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
-        #                 args=(Va_applied, Vb_applied, Vc_applied, motor, angle), method='RK45')
-        
         # Solve the ODE for phase currents over one time step
         sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
-                        args=(Va, Vb, Vc, motor, angle), method='RK45')
+                        args=(Va_applied, Vb_applied, Vc_applied, motor, angle), method='RK45')
+        
+        # Solve the ODE for phase currents over one time step
+        # sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
+        #                 args=(Va, Vb, Vc, motor, angle), method='RK45')
 
 
         Ia, Ib, Ic = sol.y[:, -1]
@@ -300,19 +300,19 @@ plt.legend()
 # plt.legend()
 
 
-plt.subplot(4, 1, 1)
-plt.plot(time_points, Va_Applied_list, label='Va_App')
-plt.plot(time_points, Vb_Applied_list, label='Vb_App')
-plt.plot(time_points, Vc_Applied_list, label='Vc_App')
-plt.title('Applied V')
-plt.legend()
 # plt.subplot(4, 1, 2)
-# plt.plot(time_points, iq_list, label='iqSensed')
-# plt.plot(time_points, id_list, label='idSensed')
-# plt.plot(time_points, iq_cmd_list, label='iqCmd')
-# plt.plot(time_points, id_cmd_list, label='idCmd')
-# plt.title('Iq, Id Cmd + Sensed')
+# plt.plot(time_points, Va_Applied_list, label='Va_App')
+# plt.plot(time_points, Vb_Applied_list, label='Vb_App')
+# plt.plot(time_points, Vc_Applied_list, label='Vc_App')
+# plt.title('Applied V')
 # plt.legend()
+plt.subplot(4, 1, 2)
+plt.plot(time_points, iq_list, label='iqSensed')
+plt.plot(time_points, id_list, label='idSensed')
+plt.plot(time_points, iq_cmd_list, label='iqCmd')
+plt.plot(time_points, id_cmd_list, label='idCmd')
+plt.title('Iq, Id Cmd + Sensed')
+plt.legend()
 
 # Plot torque
 plt.subplot(4, 1, 3)
