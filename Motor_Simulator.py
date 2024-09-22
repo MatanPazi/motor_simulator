@@ -10,15 +10,50 @@ class Motor:
         self.Rs = Rs
         self.Lq_base = Lq_base
         self.Ld_base = Ld_base
+        self.Lq = Lq_base
+        self.Ld = Ld_base        
+        self.Laa = 0
+        self.Lbb = 0
+        self.Lcc = 0
+        self.Lab = 0
+        self.Lac = 0
+        self.Lbc = 0
+        self.Laa_dot = 0
+        self.Lbb_dot = 0
+        self.Lcc_dot = 0
+        self.Lab_dot = 0
+        self.Lac_dot = 0
+        self.Lbc_dot = 0
         self.bemf_const_base = bemf_const_base
         self.inertia = inertia
         self.friction_coeff = friction_coeff
 
-    def inductance(self, Iq, Id):
+    def inductance_dq(self, Iq, Id):
         Is = np.sqrt(Iq**2 + Id**2)  # Total current magnitude
-        Lq = self.Lq_base * (1 + 0.01 * Is)
-        Ld = self.Ld_base * (1 + 0.01 * Is)
-        return Lq, Ld
+        # Todo: Need to add magnetic saturation (Reduction in inductance as a function of current)
+        self.Lq = self.Lq_base# * (1 + 0.01 * Is)
+        self.Ld = self.Ld_base# * (1 + 0.01 * Is)
+    
+    def inductance_abc(self, theta):
+        # Inductance matrix in the abc frame
+        self.Laa = self.Ld * np.cos(theta)**2 + self.Lq * np.sin(theta)**2
+        self.Lbb = self.Ld * np.cos(theta - 2*np.pi/3)**2 + self.Lq * np.sin(theta - 2*np.pi/3)**2
+        self.Lcc = self.Ld * np.cos(theta + 2*np.pi/3)**2 + self.Lq * np.sin(theta + 2*np.pi/3)**2
+        self.Lab = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta - 2*np.pi/3)
+        self.Lac = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta + 2*np.pi/3)
+        self.Lbc = (self.Ld - self.Lq) * np.cos(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3)   
+
+    def inductance_abc_dot(self, theta, speed):        
+        # Derivatives for self-inductances
+        self.Laa_dot = (2 * (self.Lq - self.Ld) * np.sin(theta) * np.cos(theta)) * speed
+        self.Lbb_dot = (2 * (self.Lq - self.Ld) * np.sin(theta - 2*np.pi/3) * np.cos(theta - 2*np.pi/3)) * speed
+        self.Lcc_dot = (2 * (self.Lq - self.Ld) * np.sin(theta + 2*np.pi/3) * np.cos(theta + 2*np.pi/3)) * speed
+        
+        # Derivatives for mutual inductances
+        self.Lab_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta - 2*np.pi/3) - np.cos(theta) * np.sin(theta - 2*np.pi/3))) * speed
+        self.Lac_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
+        self.Lbc_dot = ((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
+
 
     def bemf_constant(self, angle, harmonics=None):
         bemf = self.bemf_const_base * np.sin(self.pole_pairs * angle)
@@ -31,13 +66,12 @@ class Motor:
         return self.bemf_const_base * np.sin(self.pole_pairs * (angle + phase_shift))
 
     def torque(self, Iq, Id):
-        Lq, Ld = self.inductance(Iq, Id)
         if self.motor_type == "SPM":
             torque = 1.5 * self.pole_pairs * self.bemf_const_base * Iq
         elif self.motor_type == "IPM":
-            torque = 1.5 * self.pole_pairs * (self.bemf_const_base * Iq + (Lq - Ld) * Iq * Id)
+            torque = 1.5 * self.pole_pairs * (self.bemf_const_base * Iq + (self.Lq - self.Ld) * Iq * Id)
         elif self.motor_type == "Reluctance":
-            torque = 1.5 * self.pole_pairs * (Lq - Ld) * Iq * Id
+            torque = 1.5 * self.pole_pairs * (self.Lq - self.Ld) * Iq * Id
         return torque
 
 class Simulation:
@@ -96,8 +130,6 @@ def park_transform(Ia, Ib, Ic, angle):
 
 def phase_current_ode(t, currents, Va, Vb, Vc, motor, angle):
     Ia, Ib, Ic = currents
-    Is = np.sqrt(Ia**2 + Ib**2 + Ic**2)  # Total current magnitude
-    Lq, Ld = motor.inductance(Is, 0)
     bemf_a = motor.phase_bemf(angle, 0)
     bemf_b = motor.phase_bemf(angle, -2 * np.pi / 3)
     bemf_c = motor.phase_bemf(angle, 2 * np.pi / 3)
@@ -245,9 +277,27 @@ def simulate_motor(motor, sim, app, control):
         Vb_Applied_list.append(Vb_applied)
         Vc_Applied_list.append(Vc_applied)
 
+        # Update Lq, Ld
+        motor.inductance_dq(Iq_sensed, Id_sensed)
+        
+        # Update phase self and mutual inductances
+        motor.inductance_abc(angle)
+
+        # Update phase self and mutual inductances time derivative 
+        motor.inductance_abc_dot(angle, speed)
+
+        # Need to convert the applied terminal voltages to actual phase voltages
+        # Calculate neutral voltage
+        neutral_voltage = (Va_applied + Vb_applied + Vc_applied) / 3
+
+        # Calculate phase voltages 
+        Va_Phase = Va_applied - neutral_voltage
+        Vb_Phase = Vb_applied - neutral_voltage
+        Vc_Phase = Vc_applied - neutral_voltage
+
         # Solve the ODE for phase currents over one time step
         sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
-                        args=(Va_applied, Vb_applied, Vc_applied, motor, angle), method='RK45')
+                        args=(Va_Phase, Vb_Phase, Vc_Phase, motor, angle), method='RK45')
         
         # Solve the ODE for phase currents over one time step
         # sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
