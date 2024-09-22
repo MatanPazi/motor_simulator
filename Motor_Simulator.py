@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 class Motor:
-    def __init__(self, motor_type="SPM", pole_pairs=4, Rs=0.01, Lq_base=0.005, Ld_base=0.005,
-                 bemf_const_base=0.001, inertia=0.01, friction_coeff=0.001):
+    def __init__(self, motor_type="SPM", pole_pairs=4, Rs=0.01, Lq_base=0.0005, Ld_base=0.0005,
+                 bemf_const_base=0.001, inertia=0.0, friction_coeff=0.0):
         self.motor_type = motor_type
         self.pole_pairs = pole_pairs
         self.Rs = Rs
@@ -40,20 +40,20 @@ class Motor:
         self.Lbb = self.Ld * (np.cos(theta - 2*np.pi/3))**2 + self.Lq * (np.sin(theta - 2*np.pi/3))**2
         self.Lcc = self.Ld * (np.cos(theta + 2*np.pi/3))**2 + self.Lq * (np.sin(theta + 2*np.pi/3))**2
 
-        self.Lab = 0#(self.Ld - self.Lq) * np.cos(theta) * np.cos(theta - 2*np.pi/3)
-        self.Lac = 0#(self.Ld - self.Lq) * np.cos(theta) * np.cos(theta + 2*np.pi/3)
-        self.Lbc = 0#(self.Ld - self.Lq) * np.cos(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3)   
+        self.Lab = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta - 2*np.pi/3)
+        self.Lac = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta + 2*np.pi/3)
+        self.Lbc = (self.Ld - self.Lq) * np.cos(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3)   
 
     def inductance_abc_dot(self, theta, speed):        
         # Derivatives for self-inductances
-        self.Laa_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta) * np.cos(theta)) * speed
-        self.Lbb_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta - 2*np.pi/3) * np.cos(theta - 2*np.pi/3)) * speed
-        self.Lcc_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta + 2*np.pi/3) * np.cos(theta + 2*np.pi/3)) * speed
+        self.Laa_dot = (2 * (self.Lq - self.Ld) * np.sin(theta) * np.cos(theta)) * speed
+        self.Lbb_dot = (2 * (self.Lq - self.Ld) * np.sin(theta - 2*np.pi/3) * np.cos(theta - 2*np.pi/3)) * speed
+        self.Lcc_dot = (2 * (self.Lq - self.Ld) * np.sin(theta + 2*np.pi/3) * np.cos(theta + 2*np.pi/3)) * speed
         
         # Derivatives for mutual inductances
-        self.Lab_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta - 2*np.pi/3) - np.cos(theta) * np.sin(theta - 2*np.pi/3))) * speed
-        self.Lac_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
-        self.Lbc_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
+        self.Lab_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta - 2*np.pi/3) - np.cos(theta) * np.sin(theta - 2*np.pi/3))) * speed
+        self.Lac_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
+        self.Lbc_dot = ((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
 
     def phase_bemf(self, angle, phase_shift, harmonics=None):        
         bemf = self.bemf_const_base * np.cos(self.pole_pairs * (angle + phase_shift))
@@ -72,14 +72,14 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=100e-9, total_time=0.001):
+    def __init__(self, time_step=100e-9, total_time=0.05):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=10.0, commanded_id=0.0,
-                 speed_ramp_rate=1000000, current_ramp_rate=10000, vBus = 48):
+    def __init__(self, speed_control=True, commanded_speed=250, commanded_iq=100.0, commanded_id=0.0,
+                 speed_ramp_rate=5000000.0, current_ramp_rate=5000000.0, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -89,7 +89,7 @@ class Application:
         self.vBus = vBus        
 
 class MotorControl:
-    def __init__(self, Kp=100.0, Ki=1, sampling_time=62.5e-6, deadTime = 300e-9):
+    def __init__(self, Kp=10.0, Ki=10.0, sampling_time=62.5e-6, deadTime = 300e-9):
         self.Kp = Kp
         self.Ki = Ki
         self.sampling_time = sampling_time
@@ -100,7 +100,7 @@ class MotorControl:
 
     def pi_control(self, error_iq, error_id, current_time, Vq, Vd):
         # Only update the control at the specified sampling time step
-        if current_time - self.last_update_time >= self.sampling_time:
+        if (current_time - self.last_update_time) >= self.sampling_time:
             self.integral_error_iq += error_iq * self.sampling_time
             self.integral_error_id += error_id * self.sampling_time            
             Vq = self.Kp * error_iq + self.Ki * self.integral_error_iq
@@ -253,8 +253,10 @@ def simulate_motor(motor, sim, app, control):
         if app.speed_control:
             if speed < app.commanded_speed:
                 speed += app.speed_ramp_rate * sim.time_step
+            else:
+                speed = app.commanded_speed
         else:
-            speed += torque_current / motor.inertia * sim.time_step
+            speed += (torque_current / motor.inertia) * sim.time_step
 
         if iq_ramped < app.commanded_iq:
             iq_ramped += app.current_ramp_rate * sim.time_step
@@ -338,14 +340,14 @@ currents = np.array(currents)
 plt.figure(figsize=(10, 8))
 
 # Plot phase currents
-# plt.subplot(4, 1, 1)
-# plt.plot(time_points, currents[:, 0], label='Ia')
-# plt.plot(time_points, currents[:, 1], label='Ib')
-# plt.plot(time_points, currents[:, 2], label='Ic')
-# plt.title('Phase Currents')
-# plt.legend()
-
 plt.subplot(4, 1, 1)
+plt.plot(time_points, currents[:, 0], label='Ia')
+plt.plot(time_points, currents[:, 1], label='Ib')
+plt.plot(time_points, currents[:, 2], label='Ic')
+plt.title('Phase Currents')
+plt.legend()
+
+plt.subplot(4, 1, 2)
 plt.plot(time_points, Va_list, label='Va')
 plt.plot(time_points, Vb_list, label='Vb')
 plt.plot(time_points, Vc_list, label='Vc')
@@ -353,12 +355,12 @@ plt.title('V')
 plt.legend()
 
 
-plt.subplot(4, 1, 2)
-plt.plot(time_points, Va_Applied_list, label='Va_App')
-plt.plot(time_points, Vb_Applied_list, label='Vb_App')
-plt.plot(time_points, Vc_Applied_list, label='Vc_App')
-plt.title('Applied V')
-plt.legend()
+# plt.subplot(4, 1, 2)
+# plt.plot(time_points, Va_Applied_list, label='Va_App')
+# plt.plot(time_points, Vb_Applied_list, label='Vb_App')
+# plt.plot(time_points, Vc_Applied_list, label='Vc_App')
+# plt.title('Applied V')
+# plt.legend()
 # plt.subplot(4, 1, 2)
 # plt.plot(time_points, iq_list, label='iqSensed')
 # plt.plot(time_points, id_list, label='idSensed')
