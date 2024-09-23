@@ -280,7 +280,7 @@ def simulate_motor(motor, sim, app, control):
         iq_list.append(Iq_sensed)
         id_list.append(Id_sensed)
 
-        Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd)
+        Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd, app.vBus)
 
         # Transform Vq and Vd to Va, Vb, Vc using inverse Park-Clarke
         Va, Vb, Vc = inverse_park_transform(Vq, Vd, angle)
