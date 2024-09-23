@@ -25,8 +25,15 @@ class Motor:
         self.Lac_dot = 0
         self.Lbc_dot = 0
         self.bemf_const_base = bemf_const_base
+        self.bemf_a = 0
+        self.bemf_b = 0
+        self.bemf_c = 0
+        self.harmonics = {1: {'harmonic': 5, 'mag': bemf_const_base / 20},
+                          2: {'harmonic': 7, 'mag': bemf_const_base / 20}}        
         self.inertia = inertia
         self.friction_coeff = friction_coeff
+
+        
 
     def inductance_dq(self, Iq, Id):
         Is = np.sqrt(Iq**2 + Id**2)  # Total current magnitude
@@ -55,11 +62,11 @@ class Motor:
         self.Lac_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
         self.Lbc_dot = ((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
 
-    def phase_bemf(self, angle, phase_shift, harmonics=None):        
+    def phase_bemf(self, angle, phase_shift):
         bemf = self.bemf_const_base * np.cos(self.pole_pairs * (angle + phase_shift))
-        if harmonics:
-            for h, mag in harmonics.items():
-                bemf += mag * np.cos(h * self.pole_pairs * angle)        
+        if self.harmonics:
+            for _, data in self.harmonics.items():
+                bemf += data['mag'] * np.cos(data['harmonic'] * self.pole_pairs * (angle + phase_shift))        
         return bemf
 
     def torque(self, Iq, Id):
@@ -133,10 +140,6 @@ def park_transform(Ia, Ib, Ic, angle):
 
 def phase_current_ode(t, currents, va, vb, vc, speed, motor, angle):
     ia, ib, ic = currents
-    # Calculate bemf of each phase
-    bemf_a = motor.phase_bemf(angle, 0, None)
-    bemf_b = motor.phase_bemf(angle, -2 * np.pi / 3, None)
-    bemf_c = motor.phase_bemf(angle, 2 * np.pi / 3, None)
     
     # A is the inductance matrix with neutral voltage handling
     A = np.array([
@@ -148,9 +151,9 @@ def phase_current_ode(t, currents, va, vb, vc, speed, motor, angle):
 
     # The b vector (applied voltages minus resistive and flux terms)
     b = np.array([
-        va - ia * motor.Rs - speed * bemf_a - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
-        vb - ib * motor.Rs - speed * bemf_b - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
-        vc - ic * motor.Rs - speed * bemf_c - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
+        va - ia * motor.Rs - speed * motor.bemf_a - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
+        vb - ib * motor.Rs - speed * motor.bemf_b - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
+        vc - ic * motor.Rs - speed * motor.bemf_c - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
         0   # KCL constraint i_a + i_b + i_c = 0
         ])
 
@@ -306,6 +309,12 @@ def simulate_motor(motor, sim, app, control):
         # Update phase self and mutual inductances time derivative 
         motor.inductance_abc_dot(angle, speed)
 
+        # Calculate the phase bemf
+        motor.bemf_a = motor.phase_bemf(angle, 0)
+        motor.bemf_b = motor.phase_bemf(angle, -2 * np.pi / 3)
+        motor.bemf_c = motor.phase_bemf(angle, 2 * np.pi / 3)
+        bemf.append([motor.bemf_a, motor.bemf_b, motor.bemf_c])
+
         # Solve the ODE for phase currents over one time step
         sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
                         args=(Va_Applied, Vb_Applied, Vc_Applied, speed, motor, angle), method='RK45')
@@ -314,17 +323,11 @@ def simulate_motor(motor, sim, app, control):
         # sol = solve_ivp(phase_current_ode, [t, t + sim.time_step], [Ia, Ib, Ic],
         #                 args=(Va, Vb, Vc, motor, angle), method='RK45')
 
-
         Ia, Ib, Ic = sol.y[:, -1]
         currents.append([Ia, Ib, Ic])        
 
         torque_current = motor.torque(Iq_sensed, Id_sensed)
         torque.append(torque_current)
-
-        bemf_a = motor.phase_bemf(angle, 0)
-        bemf_b = motor.phase_bemf(angle, -2 * np.pi / 3)
-        bemf_c = motor.phase_bemf(angle, 2 * np.pi / 3)
-        bemf.append([bemf_a, bemf_b, bemf_c])
 
         angle += speed * sim.time_step
 
