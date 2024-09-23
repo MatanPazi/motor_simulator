@@ -79,7 +79,7 @@ class Simulation:
 
 class Application:
     def __init__(self, speed_control=True, commanded_speed=250, commanded_iq=100.0, commanded_id=0.0,
-                 speed_ramp_rate=5000000.0, current_ramp_rate=5000000.0, vBus = 48):
+                 speed_ramp_rate=2000.0, current_ramp_rate=5000.0, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
