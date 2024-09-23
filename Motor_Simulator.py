@@ -89,7 +89,7 @@ class Application:
         self.vBus = vBus        
 
 class MotorControl:
-    def __init__(self, Kp=10.0, Ki=10.0, sampling_time=62.5e-6, deadTime = 300e-9):
+    def __init__(self, Kp=10.0, Ki=10.0, sampling_time=62.5e-6, deadTime = 400e-9):
         self.Kp = Kp
         self.Ki = Ki
         self.sampling_time = sampling_time
