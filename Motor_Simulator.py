@@ -127,8 +127,8 @@ def inverse_park_transform(Vq, Vd, angle):
     return Va, Vb, Vc
 
 def park_transform(Ia, Ib, Ic, angle):
-    Iq = np.sqrt(2/3) * (Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3))
-    Id = np.sqrt(2/3) * (-Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3))
+    Iq = Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3)
+    Id = -Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3)
     return Iq, Id
 
 def phase_current_ode(t, currents, va, vb, vc, speed, motor, angle):
