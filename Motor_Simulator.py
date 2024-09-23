@@ -97,15 +97,21 @@ class MotorControl:
         self.integral_error_id = 0
         self.last_update_time = 0
         self.deadTime = deadTime        # deadTime must be divided by simulation time_step with no remainder.
+        self.saturation = 0
 
-    def pi_control(self, error_iq, error_id, current_time, Vq, Vd):
+    def pi_control(self, error_iq, error_id, current_time, Vq, Vd, vbus):
         # Only update the control at the specified sampling time step
         if (current_time - self.last_update_time) >= self.sampling_time:
-            self.integral_error_iq += error_iq * self.sampling_time
-            self.integral_error_id += error_id * self.sampling_time            
+            self.integral_error_iq += error_iq * self.sampling_time * (1 - self.saturation)
+            self.integral_error_id += error_id * self.sampling_time * (1 - self.saturation)            
             Vq = self.Kp * error_iq + self.Ki * self.integral_error_iq
             Vd = self.Kp * error_id + self.Ki * self.integral_error_id
             self.last_update_time = current_time
+            if (Vq**2 + Vd**2 > vbus**2):
+                volt_amp_gain = vbus / np.sqrt(Vq**2 + Vd**2)
+                self.saturation = 1
+                Vq *= volt_amp_gain
+
         else:
             return Vq, Vd
         
