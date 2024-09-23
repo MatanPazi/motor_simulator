@@ -72,7 +72,7 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=100e-9, total_time=0.05):
+    def __init__(self, time_step=200e-9, total_time=0.1):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
