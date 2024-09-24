@@ -124,21 +124,21 @@ class MotorControl:
         
         return Vq, Vd
 
-def inverse_park_transform(Vq, Vd, angle):
-    V_alpha = Vq * np.cos(angle) - Vd * np.sin(angle)
-    V_beta = Vq * np.sin(angle) + Vd * np.cos(angle)
-    
-    Va = V_alpha
-    Vb = -0.5 * V_alpha + (np.sqrt(3) / 2) * V_beta
-    Vc = -0.5 * V_alpha - (np.sqrt(3) / 2) * V_beta    
-    return Va, Vb, Vc
+# Inverse Direct DQ transformation
+# Switched q and d from the original inverse transformation because q and d currents were switched.
+def inverse_dq_transform(q, d, angle):
+    a = q * np.cos(angle) - d * np.sin(angle)
+    b = q * np.cos(angle - 2*np.pi/3) - d * np.sin(angle - 2*np.pi/3)
+    c = q * np.cos(angle + 2*np.pi/3) - d * np.sin(angle + 2*np.pi/3)
+    return a, b, c
 
-def park_transform(Ia, Ib, Ic, angle):
-    Iq = Ia * np.cos(angle) + Ib * np.cos(angle - 2*np.pi/3) + Ic * np.cos(angle + 2*np.pi/3)
-    Id = -Ia * np.sin(angle) - Ib * np.sin(angle - 2*np.pi/3) - Ic * np.sin(angle + 2*np.pi/3)
-    return Iq, Id
+# Direct DQ transformation
+def dq_transform(a, b, c, angle):
+    q = (2/3) * (a * np.cos(angle) + b * np.cos(angle - 2*np.pi/3) + c * np.cos(angle + 2*np.pi/3))
+    d = (2/3) * (-a * np.sin(angle) - b * np.sin(angle - 2*np.pi/3) - c * np.sin(angle + 2*np.pi/3))
+    return q, d
 
-def phase_current_ode(t, currents, va, vb, vc, speed, motor, angle):
+def phase_current_ode(t, currents, va, vb, vc, motor):
     ia, ib, ic = currents
     
     # A is the inductance matrix with neutral voltage handling
@@ -286,7 +286,7 @@ def simulate_motor(motor, sim, app, control):
         Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd, app.vBus)
 
         # Transform Vq and Vd to Va, Vb, Vc using inverse Park-Clarke
-        Va, Vb, Vc = inverse_park_transform(Vq, Vd, angle)
+        Va, Vb, Vc = inverse_dq_transform(Vq, Vd, angle)
         Va_list.append(Va)
         Vb_list.append(Vb)
         Vc_list.append(Vc)
