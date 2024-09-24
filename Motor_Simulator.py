@@ -278,7 +278,7 @@ def simulate_motor(motor, sim, app, control):
         id_cmd_list.append(id_ramped)
 
 
-        Iq_sensed, Id_sensed = park_transform(Ia, Ib, Ic, angle)
+        Iq_sensed, Id_sensed = dq_transform(Ia, Ib, Ic, angle)
         error_iq = iq_ramped - Iq_sensed
         error_id = id_ramped - Id_sensed
 
