@@ -153,9 +153,9 @@ def phase_current_ode(t, currents, va, vb, vc, motor):
 
     # The b vector (applied voltages minus resistive and flux terms)
     b = np.array([
-        va - ia * motor.Rs - speed * motor.bemf_a - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
-        vb - ib * motor.Rs - speed * motor.bemf_b - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
-        vc - ic * motor.Rs - speed * motor.bemf_c - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
+        va - ia * motor.Rs - motor.bemf_a - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
+        vb - ib * motor.Rs - motor.bemf_b - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
+        vc - ic * motor.Rs - motor.bemf_c - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
         0   # KCL constraint i_a + i_b + i_c = 0
         ])
 
@@ -312,9 +312,9 @@ def simulate_motor(motor, sim, app, control):
         motor.inductance_abc_dot(angle, speed)
 
         # Calculate the phase bemf
-        motor.bemf_a = motor.phase_bemf(angle, 0)
-        motor.bemf_b = motor.phase_bemf(angle, -2 * np.pi / 3)
-        motor.bemf_c = motor.phase_bemf(angle, 2 * np.pi / 3)
+        motor.bemf_a = speed * motor.phase_bemf(angle, 0)
+        motor.bemf_b = speed * motor.phase_bemf(angle, -2 * np.pi / 3)
+        motor.bemf_c = speed * motor.phase_bemf(angle, 2 * np.pi / 3)
         bemf.append([motor.bemf_a, motor.bemf_b, motor.bemf_c])
 
         # Solve the ODE for phase currents over one time step
