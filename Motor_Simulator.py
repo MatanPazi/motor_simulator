@@ -118,6 +118,8 @@ class MotorControl:
                 volt_amp_gain = vbus / np.sqrt(Vq**2 + Vd**2)
                 self.saturation = 1
                 Vq *= volt_amp_gain
+            else:
+                self.saturation = 0
 
         else:
             return Vq, Vd
