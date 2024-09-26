@@ -81,14 +81,14 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=3125e-9, total_time=0.5):
+    def __init__(self, time_step=3125e-9, total_time=0.3):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
     def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=20.0, commanded_id=0.0,
-                 speed_ramp_rate=3000.0, current_ramp_rate=7000.0, vBus = 48):
+                 speed_ramp_rate=0.0, current_ramp_rate=7000.0, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -98,7 +98,7 @@ class Application:
         self.vBus = vBus        
 
 class MotorControl:
-    def __init__(self, Kp=0.0, Ki=10.0, sampling_time=62.5e-6, deadTime = 0):
+    def __init__(self, Kp=1.0, Ki=50.0, sampling_time=62.5e-6, deadTime = 0):
         self.Kp = Kp
         self.Ki = Ki
         self.sampling_time = sampling_time
@@ -271,7 +271,7 @@ def simulate_motor(motor, sim, app, control):
 
     for t in sim.time_points:
         if app.speed_control:
-            if speed_m < app.commanded_speed:
+            if (speed_m < app.commanded_speed) and (app.speed_ramp_rate != 0):            
                 speed_m += app.speed_ramp_rate * sim.time_step
             else:
                 speed_m = app.commanded_speed
