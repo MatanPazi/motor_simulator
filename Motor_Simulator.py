@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
 
 class Motor:
-    def __init__(self, motor_type="SPM", pole_pairs=4, Rs=0.005, Lq_base=0.0001, Ld_base=0.0001,
+    def __init__(self, motor_type="SPM", pole_pairs=4, Rs=0.005, Lq_base=0.0003, Ld_base=0.0003,
                  bemf_const_base=0.1, inertia=0.0, friction_coeff=0.0, i_max = 600):
         self.motor_type = motor_type
         self.pole_pairs = pole_pairs
@@ -40,35 +40,35 @@ class Motor:
     def inductance_dq(self, Iq, Id):
         Is = np.sqrt(Iq**2 + Id**2)  # Total current magnitude
         # Todo: Need to add magnetic saturation (Reduction in inductance as a function of current)
-        self.Lq = self.Lq_base * (1 - 0.5 * Is/self.i_max)
-        self.Ld = self.Ld_base * (1 - 0.5 * Is/self.i_max)
+        self.Lq = self.Lq_base# * (1 - 0.5 * Is/self.i_max)
+        self.Ld = self.Ld_base# * (1 - 0.5 * Is/self.i_max)
     
     def inductance_abc(self, theta):
         # Inductance matrix in the abc frame
-        self.Laa = self.Ld * (np.cos(theta))**2 + self.Lq * (np.sin(theta))**2
-        self.Lbb = self.Ld * (np.cos(theta - 2*np.pi/3))**2 + self.Lq * (np.sin(theta - 2*np.pi/3))**2
-        self.Lcc = self.Ld * (np.cos(theta + 2*np.pi/3))**2 + self.Lq * (np.sin(theta + 2*np.pi/3))**2
+        self.Laa = self.Ld# * (np.cos(theta))**2 + self.Lq * (np.sin(theta))**2
+        self.Lbb = self.Ld# * (np.cos(theta - 2*np.pi/3))**2 + self.Lq * (np.sin(theta - 2*np.pi/3))**2
+        self.Lcc = self.Ld# * (np.cos(theta + 2*np.pi/3))**2 + self.Lq * (np.sin(theta + 2*np.pi/3))**2
 
-        self.Lab = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta - 2*np.pi/3)
-        self.Lac = (self.Ld - self.Lq) * np.cos(theta) * np.cos(theta + 2*np.pi/3)
-        self.Lbc = (self.Ld - self.Lq) * np.cos(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3)   
+        self.Lab = 0#(self.Ld - self.Lq) * np.cos(theta) * np.cos(theta - 2*np.pi/3)
+        self.Lac = 0#(self.Ld - self.Lq) * np.cos(theta) * np.cos(theta + 2*np.pi/3)
+        self.Lbc = 0#(self.Ld - self.Lq) * np.cos(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3)   
 
     def inductance_abc_dot(self, theta, speed):        
         # Derivatives for self-inductances
-        self.Laa_dot = (2 * (self.Lq - self.Ld) * np.sin(theta) * np.cos(theta)) * speed
-        self.Lbb_dot = (2 * (self.Lq - self.Ld) * np.sin(theta - 2*np.pi/3) * np.cos(theta - 2*np.pi/3)) * speed
-        self.Lcc_dot = (2 * (self.Lq - self.Ld) * np.sin(theta + 2*np.pi/3) * np.cos(theta + 2*np.pi/3)) * speed
+        self.Laa_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta) * np.cos(theta)) * speed
+        self.Lbb_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta - 2*np.pi/3) * np.cos(theta - 2*np.pi/3)) * speed
+        self.Lcc_dot = 0#(2 * (self.Lq - self.Ld) * np.sin(theta + 2*np.pi/3) * np.cos(theta + 2*np.pi/3)) * speed
         
         # Derivatives for mutual inductances
-        self.Lab_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta - 2*np.pi/3) - np.cos(theta) * np.sin(theta - 2*np.pi/3))) * speed
-        self.Lac_dot = ((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
-        self.Lbc_dot = ((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
+        self.Lab_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta - 2*np.pi/3) - np.cos(theta) * np.sin(theta - 2*np.pi/3))) * speed
+        self.Lac_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta) * np.cos(theta + 2*np.pi/3) - np.cos(theta) * np.sin(theta + 2*np.pi/3))) * speed
+        self.Lbc_dot = 0#((self.Ld - self.Lq) * (-np.sin(theta - 2*np.pi/3) * np.cos(theta + 2*np.pi/3) - np.cos(theta - 2*np.pi/3) * np.sin(theta + 2*np.pi/3))) * speed        
 
     def phase_bemf(self, angle, phase_shift):
-        bemf = self.bemf_const_base * np.cos(self.pole_pairs * (angle + phase_shift))
+        bemf = self.bemf_const_base * np.cos(angle + phase_shift)
         if self.harmonics:
             for _, data in self.harmonics.items():
-                bemf += data['mag'] * np.cos(data['harmonic'] * self.pole_pairs * (angle + phase_shift))        
+                bemf += data['mag'] * np.cos(data['harmonic'] * angle + phase_shift)        
         return bemf
 
     def torque(self, Iq, Id):
@@ -81,14 +81,14 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=200e-9, total_time=0.05):
+    def __init__(self, time_step=3125e-9, total_time=0.5):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=100.0, commanded_id=0.0,
-                 speed_ramp_rate=2000.0, current_ramp_rate=5000.0, vBus = 48):
+    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=20.0, commanded_id=0.0,
+                 speed_ramp_rate=3000.0, current_ramp_rate=7000.0, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -98,7 +98,7 @@ class Application:
         self.vBus = vBus        
 
 class MotorControl:
-    def __init__(self, Kp=3.0, Ki=5000.0, sampling_time=62.5e-6, deadTime = 400e-9):
+    def __init__(self, Kp=0.0, Ki=10.0, sampling_time=62.5e-6, deadTime = 0):
         self.Kp = Kp
         self.Ki = Ki
         self.sampling_time = sampling_time
@@ -155,9 +155,9 @@ def phase_current_ode(t, currents, va, vb, vc, motor):
 
     # The b vector (applied voltages minus resistive and flux terms)
     b = np.array([
-        va - ia * motor.Rs - motor.bemf_a - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
-        vb - ib * motor.Rs - motor.bemf_b - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
-        vc - ic * motor.Rs - motor.bemf_c - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
+        va - ia * motor.Rs - motor.bemf_a,# - motor.Laa_dot * ia - motor.Lab_dot * ib - motor.Lac_dot * ic,
+        vb - ib * motor.Rs - motor.bemf_b,# - motor.Lab_dot * ia - motor.Lbb_dot * ib - motor.Lbc_dot * ic,
+        vc - ic * motor.Rs - motor.bemf_c,# - motor.Lac_dot * ia - motor.Lbc_dot * ib - motor.Lcc_dot * ic,
         0   # KCL constraint i_a + i_b + i_c = 0
         ])
 
@@ -206,32 +206,32 @@ def apply_voltage_during_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_botto
     # Initialize applied voltages
     Va_applied, Vb_applied, Vc_applied = 0, 0, 0
 
-    # Phase A
-    if pwm_signals_top[0] == 0 and pwm_signals_bottom[0] == 0:
-        if Ia > 0:  # Positive current
-            Va_applied = 0  # Bottom transistor's voltage (ground)
-        else:  # Negative current
-            Va_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    else:
-        Va_applied = pwm_signals_top[0] * app.vBus
+    # # Phase A
+    # if pwm_signals_top[0] == 0 and pwm_signals_bottom[0] == 0:
+    #     if Ia > 0:  # Positive current
+    #         Va_applied = 0  # Bottom transistor's voltage (ground)
+    #     else:  # Negative current
+    #         Va_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    # else:
+    Va_applied = pwm_signals_top[0] * app.vBus
 
-    # Phase B
-    if pwm_signals_top[1] == 0 and pwm_signals_bottom[1] == 0:
-        if Ib > 0:  # Positive current
-            Vb_applied = 0  # Bottom transistor's voltage (ground)
-        else:  # Negative current
-            Vb_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    else:
-        Vb_applied = pwm_signals_top[1] * app.vBus
+    # # Phase B
+    # if pwm_signals_top[1] == 0 and pwm_signals_bottom[1] == 0:
+    #     if Ib > 0:  # Positive current
+    #         Vb_applied = 0  # Bottom transistor's voltage (ground)
+    #     else:  # Negative current
+    #         Vb_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    # else:
+    Vb_applied = pwm_signals_top[1] * app.vBus
 
-    # Phase C
-    if pwm_signals_top[2] == 0 and pwm_signals_bottom[2] == 0:
-        if Ic > 0:  # Positive current
-            Vc_applied = 0  # Bottom transistor's voltage (ground)
-        else:  # Negative current
-            Vc_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    else:
-        Vc_applied = pwm_signals_top[2] * app.vBus
+    # # Phase C
+    # if pwm_signals_top[2] == 0 and pwm_signals_bottom[2] == 0:
+    #     if Ic > 0:  # Positive current
+    #         Vc_applied = 0  # Bottom transistor's voltage (ground)
+    #     else:  # Negative current
+    #         Vc_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    # else:
+    Vc_applied = pwm_signals_top[2] * app.vBus
 
     return Va_applied, Vb_applied, Vc_applied
 
@@ -252,10 +252,13 @@ err_q_list = []
 err_d_list = []
 Vq_list = []
 Vd_list = []
+angle_e_list = []
 
 def simulate_motor(motor, sim, app, control):
-    speed = 0
-    angle = 0
+    speed_m = 0
+    speed_e = 0
+    angle_m = 0
+    angle_e = 0
     iq_ramped = 0
     id_ramped = 0
     Vq = 0
@@ -268,12 +271,13 @@ def simulate_motor(motor, sim, app, control):
 
     for t in sim.time_points:
         if app.speed_control:
-            if speed < app.commanded_speed:
-                speed += app.speed_ramp_rate * sim.time_step
+            if speed_m < app.commanded_speed:
+                speed_m += app.speed_ramp_rate * sim.time_step
             else:
-                speed = app.commanded_speed
+                speed_m = app.commanded_speed
         else:
-            speed += (torque_current / motor.inertia) * sim.time_step
+            speed_m += (torque_current / motor.inertia) * sim.time_step
+        speed_e = speed_m * motor.pole_pairs
 
         if iq_ramped < app.commanded_iq:
             iq_ramped += app.current_ramp_rate * sim.time_step
@@ -284,7 +288,7 @@ def simulate_motor(motor, sim, app, control):
         id_cmd_list.append(id_ramped)
 
 
-        Iq_sensed, Id_sensed = dq_transform(Ia, Ib, Ic, angle)
+        Iq_sensed, Id_sensed = dq_transform(Ia, Ib, Ic, angle_e)
         error_iq = iq_ramped - Iq_sensed
         error_id = id_ramped - Id_sensed
         
@@ -294,13 +298,17 @@ def simulate_motor(motor, sim, app, control):
         iq_list.append(Iq_sensed)
         id_list.append(Id_sensed)
 
-        Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd, app.vBus)
+        # Va = 0.5 * np.cos(angle_e + 0.1)
+        # Vb = 0.5 * np.cos(angle_e + 0.1 - 2 * np.pi / 3)
+        # Vc = 0.5 * np.cos(angle_e + 0.1 + 2 * np.pi / 3)
+        # Vq, Vd = dq_transform(Va, Vb, Vc, angle_e)    
 
+        Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd, app.vBus)
         Vq_list.append(Vq)
         Vd_list.append(Vd)
 
         # Transform Vq and Vd to Va, Vb, Vc using inverse Park-Clarke
-        Va, Vb, Vc = inverse_dq_transform(Vq, Vd, angle)
+        Va, Vb, Vc = inverse_dq_transform(Vq, Vd, angle_e)
         Va_list.append(Va)
         Vb_list.append(Vb)
         Vc_list.append(Vc)
@@ -318,15 +326,15 @@ def simulate_motor(motor, sim, app, control):
         motor.inductance_dq(Iq_sensed, Id_sensed)
         
         # Update phase self and mutual inductances
-        motor.inductance_abc(angle)
+        motor.inductance_abc(angle_e)
 
         # Update phase self and mutual inductances time derivative 
-        motor.inductance_abc_dot(angle, speed)
+        motor.inductance_abc_dot(angle_e, speed_e)
 
         # Calculate the phase bemf
-        motor.bemf_a = speed * motor.phase_bemf(angle, 0)
-        motor.bemf_b = speed * motor.phase_bemf(angle, -2 * np.pi / 3)
-        motor.bemf_c = speed * motor.phase_bemf(angle, 2 * np.pi / 3)
+        motor.bemf_a = speed_m * motor.phase_bemf(angle_e, 0)
+        motor.bemf_b = speed_m * motor.phase_bemf(angle_e, -2 * np.pi / 3)
+        motor.bemf_c = speed_m * motor.phase_bemf(angle_e, 2 * np.pi / 3)
         bemf.append([motor.bemf_a, motor.bemf_b, motor.bemf_c])
 
         # Solve the ODE for phase currents over one time step
@@ -339,7 +347,9 @@ def simulate_motor(motor, sim, app, control):
         torque_current = motor.torque(Iq_sensed, Id_sensed)
         torque.append(torque_current)
 
-        angle += speed * sim.time_step
+        angle_m += speed_m * sim.time_step
+        angle_e += speed_e * sim.time_step
+        angle_e_list.append(angle_e)
 
     return torque, bemf, currents
 
@@ -359,25 +369,25 @@ currents = np.array(currents)
 plt.figure(figsize=(10, 8))
 
 # Plot phase currents
-# plt.subplot(4, 1, 1)
-# plt.plot(time_points, currents[:, 0], label='Ia')
-# plt.plot(time_points, currents[:, 1], label='Ib')
-# plt.plot(time_points, currents[:, 2], label='Ic')
-# plt.title('Phase Currents')
-# plt.legend()
-
-plt.subplot(4, 1, 1)
-plt.plot(time_points, err_q_list, label='q_err')
-plt.plot(time_points, err_d_list, label='d_err')
-plt.title('Iq, Id errors')
+plt.subplot(4, 1, 4)
+plt.plot(time_points, currents[:, 0], label='Ia')
+plt.plot(time_points, currents[:, 1], label='Ib')
+plt.plot(time_points, currents[:, 2], label='Ic')
+plt.title('Phase Currents')
 plt.legend()
 
 # plt.subplot(4, 1, 2)
-# plt.plot(time_points, Va_list, label='Va')
-# plt.plot(time_points, Vb_list, label='Vb')
-# plt.plot(time_points, Vc_list, label='Vc')
-# plt.title('V')
+# plt.plot(time_points, err_q_list, label='q_err')
+# plt.plot(time_points, err_d_list, label='d_err')
+# plt.title('Iq, Id errors')
 # plt.legend()
+
+plt.subplot(4, 1, 2)
+plt.plot(time_points, Va_list, label='Va')
+plt.plot(time_points, Vb_list, label='Vb')
+plt.plot(time_points, Vc_list, label='Vc')
+plt.title('V')
+plt.legend()
 
 
 # plt.subplot(4, 1, 2)
