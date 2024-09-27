@@ -81,13 +81,13 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=3125e-9, total_time=0.3):
+    def __init__(self, time_step=100e-9, total_time=0.1):
         self.time_step = time_step      # Simulation time_step must be the divisor of the sampling_time with no remainder.
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=20.0, commanded_id=0.0,
+    def __init__(self, speed_control=True, commanded_speed=0, commanded_iq=20.0, commanded_id=0.0,
                  speed_ramp_rate=0.0, current_ramp_rate=7000.0, vBus = 48):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
@@ -98,7 +98,7 @@ class Application:
         self.vBus = vBus        
 
 class MotorControl:
-    def __init__(self, Kp=1.0, Ki=50.0, sampling_time=62.5e-6, deadTime = 0):
+    def __init__(self, Kp=1.0, Ki=20.0, sampling_time=62.5e-6, deadTime = 300e-9):
         self.Kp = Kp
         self.Ki = Ki
         self.sampling_time = sampling_time
@@ -116,10 +116,11 @@ class MotorControl:
             Vq = self.Kp * error_iq + self.Ki * self.integral_error_iq
             Vd = self.Kp * error_id + self.Ki * self.integral_error_id
             self.last_update_time = current_time
-            if (Vq**2 + Vd**2 > vbus**2):
+            if ((Vq**2 + Vd**2) > vbus**2):
                 volt_amp_gain = vbus / np.sqrt(Vq**2 + Vd**2)
                 self.saturation = 1
                 Vq *= volt_amp_gain
+                Vd *= volt_amp_gain
             else:
                 self.saturation = 0
 
@@ -207,31 +208,31 @@ def apply_voltage_during_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_botto
     Va_applied, Vb_applied, Vc_applied = 0, 0, 0
 
     # # Phase A
-    # if pwm_signals_top[0] == 0 and pwm_signals_bottom[0] == 0:
-    #     if Ia > 0:  # Positive current
-    #         Va_applied = 0  # Bottom transistor's voltage (ground)
-    #     else:  # Negative current
-    #         Va_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    # else:
-    Va_applied = pwm_signals_top[0] * app.vBus
+    if pwm_signals_top[0] == 0 and pwm_signals_bottom[0] == 0:
+        if Ia > 0:  # Positive current
+            Va_applied = 0  # Bottom transistor's voltage (ground)
+        else:  # Negative current
+            Va_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    else:
+        Va_applied = pwm_signals_top[0] * app.vBus
 
     # # Phase B
-    # if pwm_signals_top[1] == 0 and pwm_signals_bottom[1] == 0:
-    #     if Ib > 0:  # Positive current
-    #         Vb_applied = 0  # Bottom transistor's voltage (ground)
-    #     else:  # Negative current
-    #         Vb_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    # else:
-    Vb_applied = pwm_signals_top[1] * app.vBus
+    if pwm_signals_top[1] == 0 and pwm_signals_bottom[1] == 0:
+        if Ib > 0:  # Positive current
+            Vb_applied = 0  # Bottom transistor's voltage (ground)
+        else:  # Negative current
+            Vb_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    else:
+        Vb_applied = pwm_signals_top[1] * app.vBus
 
     # # Phase C
-    # if pwm_signals_top[2] == 0 and pwm_signals_bottom[2] == 0:
-    #     if Ic > 0:  # Positive current
-    #         Vc_applied = 0  # Bottom transistor's voltage (ground)
-    #     else:  # Negative current
-    #         Vc_applied = app.vBus  # Top transistor's voltage (bus voltage)
-    # else:
-    Vc_applied = pwm_signals_top[2] * app.vBus
+    if pwm_signals_top[2] == 0 and pwm_signals_bottom[2] == 0:
+        if Ic > 0:  # Positive current
+            Vc_applied = 0  # Bottom transistor's voltage (ground)
+        else:  # Negative current
+            Vc_applied = app.vBus  # Top transistor's voltage (bus voltage)
+    else:
+        Vc_applied = pwm_signals_top[2] * app.vBus
 
     return Va_applied, Vb_applied, Vc_applied
 
@@ -292,8 +293,8 @@ def simulate_motor(motor, sim, app, control):
         error_iq = iq_ramped - Iq_sensed
         error_id = id_ramped - Id_sensed
         
-        err_q_list.append(error_iq)
-        err_d_list.append(error_id)
+        err_q_list.append(control.integral_error_iq)
+        # err_d_list.append(error_id)
 
         iq_list.append(Iq_sensed)
         id_list.append(Id_sensed)
@@ -306,6 +307,7 @@ def simulate_motor(motor, sim, app, control):
         Vq, Vd = control.pi_control(error_iq, error_id, t, Vq, Vd, app.vBus)
         Vq_list.append(Vq)
         Vd_list.append(Vd)
+        
 
         # Transform Vq and Vd to Va, Vb, Vc using inverse Park-Clarke
         Va, Vb, Vc = inverse_dq_transform(Vq, Vd, angle_e)
@@ -378,7 +380,7 @@ plt.legend()
 
 # plt.subplot(4, 1, 2)
 # plt.plot(time_points, err_q_list, label='q_err')
-# plt.plot(time_points, err_d_list, label='d_err')
+# # plt.plot(time_points, err_d_list, label='d_err')
 # plt.title('Iq, Id errors')
 # plt.legend()
 
@@ -390,12 +392,12 @@ plt.title('V')
 plt.legend()
 
 
-# plt.subplot(4, 1, 2)
-# plt.plot(time_points, Va_Applied_list, label='Va_App')
-# plt.plot(time_points, Vb_Applied_list, label='Vb_App')
-# plt.plot(time_points, Vc_Applied_list, label='Vc_App')
-# plt.title('Applied V')
-# plt.legend()
+plt.subplot(4, 1, 4)
+plt.plot(time_points, Va_Applied_list, label='Va_App')
+plt.plot(time_points, Vb_Applied_list, label='Vb_App')
+plt.plot(time_points, Vc_Applied_list, label='Vc_App')
+plt.title('Applied V')
+plt.legend()
 plt.subplot(4, 1, 1)
 plt.plot(time_points, iq_list, label='iqSensed')
 plt.plot(time_points, id_list, label='idSensed')
@@ -417,9 +419,9 @@ plt.legend()
 
 
 # Plot back EMF
-plt.subplot(4, 1, 4)
-plt.plot(time_points, bemf)
-plt.title('Back EMF')
+# plt.subplot(4, 1, 4)
+# plt.plot(time_points, bemf)
+# plt.title('Back EMF')
 
 plt.tight_layout()
 plt.show()
