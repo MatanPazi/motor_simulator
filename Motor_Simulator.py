@@ -420,3 +420,9 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+
+'''
+TODO:
+Add short circuit test option
+Calculate bode of PI and system to know BW.
+'''
