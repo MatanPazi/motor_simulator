@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 
 class Motor:
     def __init__(self, motor_type="SYNC", pole_pairs=4, Rs=0.005, Lq_base=0.0001, Ld_base=0.0001,
-                 bemf_const_base=0.1, inertia=0.0, friction_coeff=0.0, i_max = 600):
+                 bemf_const_base=0.1, inertia=0.0, visc_fric_coeff=0.0, i_max = 600):
         self.motor_type = motor_type
         self.pole_pairs = pole_pairs
         self.Rs = Rs
@@ -28,11 +28,13 @@ class Motor:
         self.bemf_a = 0
         self.bemf_b = 0
         self.bemf_c = 0
-        self.harmonics = None
-        # self.harmonics = {1: {'harmonic': 5, 'mag': bemf_const_base / 20},
-        #                   2: {'harmonic': 7, 'mag': bemf_const_base / 20}}                
+        # self.harmonics = None
+        self.harmonics = {1: {'harmonic': 5, 'mag': bemf_const_base / 20},
+                          2: {'harmonic': 5, 'mag': bemf_const_base / 20},
+                          3: {'harmonic': 9, 'mag': bemf_const_base / 40},
+                          4: {'harmonic': 11, 'mag': bemf_const_base / 40}}
         self.inertia = inertia
-        self.friction_coeff = friction_coeff
+        self.visc_fric_coeff = visc_fric_coeff
         self.i_max = i_max
 
         
@@ -93,21 +95,22 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=100e-9, total_time=0.01):
+    def __init__(self, time_step=100e-9, total_time=0.02):
         self.time_step = time_step
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=100.0, commanded_id=0.0,
-                 speed_ramp_rate=100000.0, current_ramp_rate=7000.0, vBus = 48):
+    def __init__(self, speed_control=True, commanded_speed=400, commanded_iq=0.0, commanded_id=-100.0,
+                 speed_ramp_rate=10000.0, current_ramp_rate=7000.0, vBus = 48, init_speed = 0):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
         self.commanded_id = commanded_id
         self.speed_ramp_rate = speed_ramp_rate
         self.current_ramp_rate = current_ramp_rate
-        self.vBus = vBus        
+        self.vBus = vBus
+        self.init_speed = init_speed
 
 class MotorControl:
     def __init__(self, Kp=5.0, Ki=200.0, sampling_time=62.5e-6, deadTime = 300e-9):
@@ -275,8 +278,8 @@ angle_list = []
 
 def simulate_motor(motor, sim, app, control):
     # Initializations
-    speed_m = 0
-    speed_e = 0
+    speed_m = app.init_speed
+    speed_e = speed_m * motor.pole_pairs
     angle_m = 0
     angle_e = 0
     iq_ramped = 0
@@ -294,7 +297,7 @@ def simulate_motor(motor, sim, app, control):
             else:
                 speed_m = app.commanded_speed
         else:
-            speed_m += (torque_current / motor.inertia) * sim.time_step
+            speed_m += ((torque_current - speed_m * motor.visc_fric_coeff) / motor.inertia) * sim.time_step
         speed_e = speed_m * motor.pole_pairs
         speed_list.append([speed_m, speed_e])
 
