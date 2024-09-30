@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+import control as ctrl
 
 class Motor:
     def __init__(self, motor_type="SYNC", pole_pairs=4, Rs=0.005, Lq_base=0.0001, Ld_base=0.0001,
@@ -28,11 +29,11 @@ class Motor:
         self.bemf_a = 0
         self.bemf_b = 0
         self.bemf_c = 0
-        # self.harmonics = None
-        self.harmonics = {1: {'harmonic': 5, 'mag': bemf_const_base / 20},
-                          2: {'harmonic': 5, 'mag': bemf_const_base / 20},
-                          3: {'harmonic': 9, 'mag': bemf_const_base / 40},
-                          4: {'harmonic': 11, 'mag': bemf_const_base / 40}}
+        self.harmonics = None
+        # self.harmonics = {1: {'harmonic': 5, 'mag': bemf_const_base / 20},
+        #                   2: {'harmonic': 5, 'mag': bemf_const_base / 20},
+        #                   3: {'harmonic': 9, 'mag': bemf_const_base / 40},
+        #                   4: {'harmonic': 11, 'mag': bemf_const_base / 40}}
         self.inertia = inertia
         self.visc_fric_coeff = visc_fric_coeff
         self.i_max = i_max
@@ -95,14 +96,14 @@ class Motor:
         return torque
 
 class Simulation:
-    def __init__(self, time_step=100e-9, total_time=0.02):
+    def __init__(self, time_step=100e-9, total_time=0.05):
         self.time_step = time_step
         self.total_time = total_time
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=400, commanded_iq=0.0, commanded_id=-100.0,
-                 speed_ramp_rate=10000.0, current_ramp_rate=7000.0, vBus = 48, init_speed = 0):
+    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=50.0, commanded_id=-50.0,
+                 speed_ramp_rate=10000.0, current_ramp_rate=7000.0, vBus = 48, init_speed = 0, short_circuit = True):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -111,11 +112,14 @@ class Application:
         self.current_ramp_rate = current_ramp_rate
         self.vBus = vBus
         self.init_speed = init_speed
+        self.short_circuit = short_circuit
 
 class MotorControl:
-    def __init__(self, Kp=5.0, Ki=200.0, sampling_time=62.5e-6, deadTime = 300e-9):
-        self.Kp = Kp
-        self.Ki = Ki
+    def __init__(self, Kp_d=5.0, Ki_d=200.0, Kp_q=5.0, Ki_q=200.0, sampling_time=62.5e-6, deadTime = 300e-9):
+        self.Kp_d = Kp_d
+        self.Ki_d = Ki_d
+        self.Kp_q = Kp_q
+        self.Ki_q = Ki_q
         self.sampling_time = sampling_time
         self.integral_error_iq = 0
         self.integral_error_id = 0
@@ -131,8 +135,8 @@ class MotorControl:
         if (current_time - self.last_update_time) >= self.sampling_time:
             self.integral_error_iq += error_iq * self.sampling_time * (1 - self.saturation)
             self.integral_error_id += error_id * self.sampling_time * (1 - self.saturation)            
-            Vq = self.Kp * error_iq + self.Ki * self.integral_error_iq
-            Vd = self.Kp * error_id + self.Ki * self.integral_error_id
+            Vq = self.Kp_q * error_iq + self.Ki_q * self.integral_error_iq
+            Vd = self.Kp_d * error_id + self.Ki_d * self.integral_error_id
             self.last_update_time = current_time
             # Saturation handling
             if ((Vq**2 + Vd**2) > vbus**2):
@@ -262,6 +266,28 @@ def terminal_voltage_with_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_bott
 
     return Va_Terminal, Vb_Terminal, Vc_Terminal
 
+def estimate_BW():
+    # Transfer function: G(s) = 1 / (L * s + r)
+    num_d = [1]
+    den_d = [motor.Ld, motor.Rs]
+    num_q = [1]
+    den_q = [motor.Lq, motor.Rs]
+    num_pi_d = [control.Kp_d, control.Ki_d]
+    den_pi_d = [1, 0]
+    num_pi_q = [control.Kp_q, control.Ki_q]
+    den_pi_q = [1, 0]    
+
+    # Create transfer function
+    G_d = ctrl.TransferFunction(num_d, den_d)
+    G_q = ctrl.TransferFunction(num_q, den_q)
+
+    # Plot Bode plot
+    mag, phase, omega = ctrl.bode(G_d, dB=True, Hz=False, omega_limits=(1e-1, 1e3), plot=True, label = 'D axis')
+    mag, phase, omega = ctrl.bode(G_q, dB=True, Hz=False, omega_limits=(1e-1, 1e3), plot=True, label = 'Q axis')
+
+    # Show the plot
+    plt.show()    
+
 # Lists for plotting:
 speed_list = []
 iqd_ramped_list = []
@@ -273,7 +299,7 @@ pwm_list = []
 V_terminal = []
 bemf = []
 currents = []    
-torque = []
+torque_list = []
 angle_list = []
 
 def simulate_motor(motor, sim, app, control):
@@ -297,7 +323,7 @@ def simulate_motor(motor, sim, app, control):
             else:
                 speed_m = app.commanded_speed
         else:
-            speed_m += ((torque_current - speed_m * motor.visc_fric_coeff) / motor.inertia) * sim.time_step
+            speed_m += ((torque - speed_m * motor.visc_fric_coeff) / motor.inertia) * sim.time_step
         speed_e = speed_m * motor.pole_pairs
         speed_list.append([speed_m, speed_e])
 
@@ -330,8 +356,14 @@ def simulate_motor(motor, sim, app, control):
         Va, Vb, Vc = inverse_dq_transform(Vq, Vd, angle_e)
         Vabc_list.append([Va, Vb, Vc])
 
-        # Calculate transistor values including dead time
-        pwm_signals_top, pwm_signals_bottom = center_aligned_pwm_with_deadtime(Va, Vb, Vc, app.vBus, t, (1/control.sampling_time), control.deadTime)
+        # Calculate transistor values including dead time        
+        # Activate short circuiting at half the sim time if applicable
+        if (app.short_circuit == False) or ((app.short_circuit == True) and (t < (sim.total_time / 2))):
+            pwm_signals_top, pwm_signals_bottom = center_aligned_pwm_with_deadtime(Va, Vb, Vc, app.vBus, t, (1/control.sampling_time), control.deadTime)        
+        else:
+            pwm_signals_top = [0, 0, 0]
+            pwm_signals_bottom = [1, 1, 1]                    
+
         pwm_list.append([pwm_signals_top, pwm_signals_bottom])
 
         # Calculate terminal voltages including dead time
@@ -360,8 +392,8 @@ def simulate_motor(motor, sim, app, control):
         Ia, Ib, Ic = sol.y[:, -1]
         currents.append([Ia, Ib, Ic])        
 
-        torque_current = motor.torque(Iq_sensed, Id_sensed)
-        torque.append(torque_current)
+        torque = motor.torque(Iq_sensed, Id_sensed)
+        torque_list.append(torque)
 
         angle_m += speed_m * sim.time_step
         angle_e += speed_e * sim.time_step
@@ -372,6 +404,9 @@ motor = Motor()
 sim = Simulation()
 app = Application()
 control = MotorControl()
+
+# Plot system bode plots
+estimate_BW()
 
 # Run the simulation
 simulate_motor(motor, sim, app, control)
@@ -388,24 +423,31 @@ pwm_list = np.array(pwm_list)
 V_terminal = np.array(V_terminal)
 bemf = np.array(bemf)
 currents = np.array(currents)
-torque = np.array(torque)
+torque = np.array(torque_list)
 angle_list = np.array(angle_list)
 
 plt.figure(figsize=(10, 8))
 
+# plt.subplot(4, 1, 1)
+# plt.plot(time_points, iqd_sensed_list[:, 0], label='iqSensed')
+# plt.plot(time_points, iqd_sensed_list[:, 1], label='idSensed')
+# plt.plot(time_points, iqd_ramped_list[:, 0], label='iqCmd')
+# plt.plot(time_points, iqd_ramped_list[:, 1], label='idCmd')
+# plt.title('Iq, Id Cmd + Sensed')
+# plt.legend()
+
 plt.subplot(4, 1, 1)
-plt.plot(time_points, iqd_sensed_list[:, 0], label='iqSensed')
-plt.plot(time_points, iqd_sensed_list[:, 1], label='idSensed')
-plt.plot(time_points, iqd_ramped_list[:, 0], label='iqCmd')
-plt.plot(time_points, iqd_ramped_list[:, 1], label='idCmd')
-plt.title('Iq, Id Cmd + Sensed')
+plt.plot(time_points, currents[:, 0], label='ia')
+plt.plot(time_points, currents[:, 1], label='ib')
+plt.plot(time_points, currents[:, 2], label='ic')
+plt.title('Phase currents')
 plt.legend()
 
 plt.subplot(4, 1, 2)
-plt.plot(time_points, currents[:, 0], label='Ia')
-plt.plot(time_points, currents[:, 1], label='Ib')
-plt.plot(time_points, currents[:, 2], label='Ic')
-plt.title('Phase Currents')
+plt.plot(time_points, Vabc_list[:, 0], label='Va')
+plt.plot(time_points, Vabc_list[:, 1], label='Vb')
+plt.plot(time_points, Vabc_list[:, 2], label='Vc')
+plt.title('Phase Voltages')
 plt.legend()
 
 plt.subplot(4, 1, 3)
@@ -424,8 +466,10 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
+
 '''
 TODO:
+Verify that injecting Id lowers voltage amplitude.
 Add short circuit test option
 Calculate bode of PI and system to know BW.
 '''
