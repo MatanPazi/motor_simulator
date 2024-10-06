@@ -102,8 +102,8 @@ class Simulation:
         self.time_points = np.arange(0, total_time, time_step)
 
 class Application:
-    def __init__(self, speed_control=True, commanded_speed=100, commanded_iq=50.0, commanded_id=-50.0,
-                 speed_ramp_rate=10000.0, current_ramp_rate=7000.0, vBus = 48, init_speed = 0, short_circuit = True):
+    def __init__(self, speed_control=True, commanded_speed=50, commanded_iq=0.0, commanded_id=-50.0,
+                 speed_ramp_rate=0.0, current_ramp_rate=7000.0, vBus = 48, init_speed = 0, short_circuit = False):
         self.speed_control = speed_control
         self.commanded_speed = commanded_speed
         self.commanded_iq = commanded_iq
@@ -430,8 +430,8 @@ sim = Simulation()
 app = Application()
 control = MotorControl()
 
-# Plot system bode plots
-estimate_BW()
+# Uncommend to show closed loop bode plots:
+# estimate_BW()
 
 # Run the simulation
 simulate_motor(motor, sim, app, control)
