@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 import control as ctrl
 
 class Motor:
-    def __init__(self, motor_type="SYNC", pole_pairs=4, Rs=0.005, Lq_base=0.0001, Ld_base=0.0001,
+    def __init__(self, motor_type="SYNC", pole_pairs=4, Rs=0.0029, Lq_base=0.0000685, Ld_base=0.0000435,
                  bemf_const_base=0.1, inertia=0.0, visc_fric_coeff=0.0, i_max = 600):
         self.motor_type = motor_type
         self.pole_pairs = pole_pairs
@@ -115,7 +115,7 @@ class Application:
         self.short_circuit = short_circuit
 
 class MotorControl:
-    def __init__(self, Kp_d=5.0, Ki_d=200.0, Kp_q=5.0, Ki_q=200.0, sampling_time=62.5e-6, deadTime = 300e-9):
+    def __init__(self, Kp_d=0.2, Ki_d=50.0, Kp_q=0.2, Ki_q=50.0, sampling_time=62.5e-6, deadTime = 300e-9):
         self.Kp_d = Kp_d
         self.Ki_d = Ki_d
         self.Kp_q = Kp_q
@@ -267,25 +267,50 @@ def terminal_voltage_with_deadtime(Ia, Ib, Ic, pwm_signals_top, pwm_signals_bott
     return Va_Terminal, Vb_Terminal, Vc_Terminal
 
 def estimate_BW():
-    # Transfer function: G(s) = 1 / (L * s + r)
+    # Motor transfer function: G(s) = 1 / (L * s + r)
     num_d = [1]
     den_d = [motor.Ld, motor.Rs]
     num_q = [1]
     den_q = [motor.Lq, motor.Rs]
+    # PI transfer function: G(s) = (Kp * s + Ki) / (s)
     num_pi_d = [control.Kp_d, control.Ki_d]
     den_pi_d = [1, 0]
     num_pi_q = [control.Kp_q, control.Ki_q]
     den_pi_q = [1, 0]    
 
-    # Create transfer function
+    # Create transfer functions
     G_d = ctrl.TransferFunction(num_d, den_d)
+    PI_d = ctrl.TransferFunction(num_pi_d, den_pi_d)
+
     G_q = ctrl.TransferFunction(num_q, den_q)
+    PI_q = ctrl.TransferFunction(num_pi_q, den_pi_q)
 
-    # Plot Bode plot
-    mag, phase, omega = ctrl.bode(G_d, dB=True, Hz=False, omega_limits=(1e-1, 1e3), plot=True, label = 'D axis')
-    mag, phase, omega = ctrl.bode(G_q, dB=True, Hz=False, omega_limits=(1e-1, 1e3), plot=True, label = 'Q axis')
+    OL_d = ctrl.series(G_d, PI_d)
+    CL_d = ctrl.feedback(OL_d,1)
+    OL_q = ctrl.series(G_q, PI_q)
+    CL_q = ctrl.feedback(OL_q,1)
 
-    # Show the plot
+    # Plot Bode plots
+    plt.figure(1)
+    _,_,_ = ctrl.bode_plot(G_d, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'Plant')
+    _,_,_ = ctrl.bode_plot(PI_d, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'PI')
+    _,_,_ = ctrl.bode_plot(OL_d, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'Open loop')
+    mag_d, _, omega_d = ctrl.bode_plot(CL_d, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=True, label = 'Closed loop')    
+    BWIndex = (np.where(mag_d < 0.707))[0][0]
+    BW_d = omega_d[BWIndex] / (2 * np.pi)
+    plt.title('D Axis:    BW = ' + "{:.0f}".format(BW_d) + '[Hz]', x = 0.5, y = 2.2, fontsize = 20)
+    plt.legend()
+
+    plt.figure(2)
+    _,_,_ = ctrl.bode_plot(G_q, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'Plant')
+    _,_,_ = ctrl.bode_plot(PI_q, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'PI')
+    _,_,_ = ctrl.bode_plot(OL_q, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=False, label = 'Open loop')
+    mag_q, _, omega_q = ctrl.bode_plot(CL_q, dB=True, Hz=True, omega_limits=(10e0, 10e4), plot=True, label = 'Closed loop')
+    BWIndex = (np.where(mag_q < 0.707))[0][0]
+    BW_q = omega_q[BWIndex] / (2 * np.pi)
+    plt.title('Q Axis:    BW = ' + "{:.0f}".format(BW_q) + '[Hz]', x = 0.5, y = 2.2, fontsize = 20)
+    plt.legend()
+
     plt.show()    
 
 # Lists for plotting:
