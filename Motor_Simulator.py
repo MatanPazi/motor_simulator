@@ -494,6 +494,9 @@ plt.show()
 
 '''
 TODO:
-Verify that injecting Id lowers voltage amplitude.
+Verify that injecting negative Id lowers voltage amplitude.
+Result: Injecting positive Id helped. I would expect negative Id to help, something's off. Need to fix.
+
+
 Add short circuit test option
 '''
