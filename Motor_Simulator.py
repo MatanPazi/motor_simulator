@@ -496,5 +496,4 @@ plt.show()
 TODO:
 Verify that injecting Id lowers voltage amplitude.
 Add short circuit test option
-Calculate bode of PI and system to know BW.
 '''
