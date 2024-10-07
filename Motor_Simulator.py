@@ -156,9 +156,9 @@ def inverse_dq_transform(q, d, angle):
     Inverse Direct DQ transformation
     Switched q and d from the original inverse transformation because q and d currents were switched.    
     '''
-    a = q * np.cos(angle) - d * np.sin(angle)
-    b = q * np.cos(angle - 2*np.pi/3) - d * np.sin(angle - 2*np.pi/3)
-    c = q * np.cos(angle + 2*np.pi/3) - d * np.sin(angle + 2*np.pi/3)
+    a =  d * np.sin(angle) + q * np.cos(angle)
+    b =  d * np.sin(angle - 2*np.pi/3) + q * np.cos(angle - 2*np.pi/3)
+    c =  d * np.sin(angle + 2*np.pi/3) + q * np.cos(angle + 2*np.pi/3)
     return a, b, c
 
 # Direct DQ transformation
@@ -166,8 +166,8 @@ def dq_transform(a, b, c, angle):
     '''
     Direct DQ transformation
     '''    
-    q = (2/3) * (a * np.cos(angle) + b * np.cos(angle - 2*np.pi/3) + c * np.cos(angle + 2*np.pi/3))
-    d = (2/3) * (-a * np.sin(angle) - b * np.sin(angle - 2*np.pi/3) - c * np.sin(angle + 2*np.pi/3))
+    d = (2/3) * (a * np.sin(angle) + b * np.sin(angle - 2*np.pi/3) + c * np.sin(angle + 2*np.pi/3))
+    q = (2/3) * (a * np.cos(angle) + b * np.cos(angle - 2*np.pi/3) + c * np.cos(angle + 2*np.pi/3))    
     return q, d
 
 def phase_current_ode(t, currents, va, vb, vc, motor):
@@ -494,9 +494,5 @@ plt.show()
 
 '''
 TODO:
-Verify that injecting negative Id lowers voltage amplitude.
-Result: Injecting positive Id helped. I would expect negative Id to help, something's off. Need to fix.
-
-
 Add short circuit test option
 '''
