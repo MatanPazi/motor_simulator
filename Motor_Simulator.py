@@ -5,7 +5,7 @@ import control as ctrl
 
 class Motor:
     def __init__(self, motor_type="SYNC", pole_pairs=4, Rs=0.0029, Lq_base=0.0000685, Ld_base=0.0000435,
-                 bemf_const_base=0.1, inertia=0.0, visc_fric_coeff=0.0, i_max = 600):
+                 bemf_const_base=0.1, inertia=0.0091, visc_fric_coeff=0.0005, i_max = 600):
         self.motor_type = motor_type
         self.pole_pairs = pole_pairs
         self.Rs = Rs
