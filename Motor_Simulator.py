@@ -338,6 +338,7 @@ def simulate_motor(motor, sim, app, control):
     Vq = 0
     Vd = 0
     Ia, Ib, Ic = 0, 0, 0
+    torque = 0
 
     for t in sim.time_points:
         # Ramp handling
