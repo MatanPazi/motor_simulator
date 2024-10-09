@@ -495,5 +495,4 @@ plt.show()
 
 '''
 TODO:
-Add short circuit test option
 '''
