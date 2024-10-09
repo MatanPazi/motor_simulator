@@ -90,9 +90,9 @@ class Motor:
         Calculate Torque based on motor type: Synchronous or asynchronous
         """           
         if self.motor_type == "SYNC":
-            torque = 1.5 * self.pole_pairs * (self.bemf_const_base * Iq + (self.Lq - self.Ld) * Iq * Id)
+            torque = self.bemf_const_base * Iq + 1.5 * self.pole_pairs * (self.Lq - self.Ld) * Iq * Id
         else: # ASYNC motor
-            torque = 1.5 * self.pole_pairs * (self.Lq - self.Ld) * Iq * Id
+            torque = self.bemf_const_base * Iq + 1.5 * self.pole_pairs * (self.Lq - self.Ld) * Iq * Id # TODO: Update equation
         return torque
 
 class Simulation:
